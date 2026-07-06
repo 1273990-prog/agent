@@ -1,7 +1,7 @@
 import json
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 from common.constants import AgentConstants
 
 SAFE_QUERY_REGISTRY: Dict[str, str] = {    
@@ -46,8 +46,8 @@ class DbConn:
         return self.__net_value
 
     @net_value.setter
-    def net_value(self, value_json: str):
-        self.__net_value = json.loads(value_json)
+    def net_value(self, net_value_json: str):
+        self.__net_value = json.loads(net_value_json)
 
     @property
     def data_value(self) -> Optional[Dict[str, Any]]:
@@ -121,14 +121,13 @@ class DbConn:
             # 2) 쿼리 실행
             self.__cursor.execute(self.__sql_query, bind_params)
 
-            print(self.__sql_query, bind_params)
-
             # 3) 액션에 따른 반환 데이터 처리 (HttpConn의 ReadToEnd Stream 처리와 대응)
             result_data: Any = None
 
             if self.__action == AgentConstants.SELECT:
+                rows = self.__cursor.fetchall()
                 # SELECT 계열이면 결과 로우 전체 Fetch
-                result_data = self.__cursor.fetchall()
+                result_data = [{}] if len(rows) == 0 else rows
             else:
                 # INSERT, UPDATE, DELETE 계열이면 트랜잭션 반영 및 영향받은 행 수 리턴
                 self.__connection.commit()

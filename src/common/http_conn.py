@@ -31,8 +31,8 @@ class HttpConn:
 
     # 데이터 입력 시에도 JSON 문자열을 받아 처리할 수 있도록 Setter 수정
     @net_value.setter
-    def net_value(self, value_json: str):
-        self.__net_value = json.loads(value_json)
+    def net_value(self, net_value_json: str):
+        self.__net_value = json.loads(net_value_json)
 
     @property
     def data_value(self) -> Optional[Dict[str, Any]]:
@@ -171,7 +171,6 @@ class HttpConn:
             self.__web_resp = session.send(prepared_request)
             
             # 3. HTTP 에러 상태(4xx, 5xx)일 경우 자동으로 예외(HTTPError)를 발생시켜 
-            #    C#의 WebException 캐치 블록 흐름으로 유도합니다.
             self.__web_resp.raise_for_status()
 
             # 4. StreamReader.ReadToEnd()와 동일하게 전체 본문 텍스트 반환
@@ -189,6 +188,5 @@ class HttpConn:
             print(f"Failed to create response: {e}")
             raise e
         finally:
-            # 파이썬의 requests 세션은 connection pool을 사용하므로 
-            # C#처럼 스트림을 일일이 close()하지 않아도 자동으로 안전하게 소멸 자원 관리가 됩니다.
+            # 파이썬의 requests 세션은 connection pool을 사용하므로 자동으로 안전하게 소멸 자원 관리가 됩니다.
             session.close()

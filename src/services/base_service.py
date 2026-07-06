@@ -38,8 +38,8 @@ class BaseService:
             query_data_json = json.dumps(query_data)                      
                                                                      
             # 쿼리 바인딩 요청 실행                                      
-            db_conn.create_request(query_data_json)        
-                                                                     
+            db_conn.create_request(query_data_json)
+
             return db_conn.create_response()                            
         except Exception as e:
             print(e)
