@@ -1,8 +1,9 @@
 import json
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from services.base_service import BaseService
 from services.registry import register_service
 from common.constants import AgentConstants
+from common.utils import AgentUtils
 
 @register_service(AgentConstants.KIS)  # Registers the KIS service name dynamically
 class KisService(BaseService):
@@ -10,32 +11,114 @@ class KisService(BaseService):
         super().__init__()
         self.__url_base: str = "https://openapi.koreainvestment.com:9443"
 
+    def check_valid_token(self, config_json: str) -> str:
+        try:
+            config: Dict[str, Any] = config_json
+
+            if not config:
+                print("[오류] 설정을 불러올 수 없어 프로그램을 종료합니다.")
+                return
+
+            access_token = None
+
+            db_host = config.get("db_host", "")
+            port = config.get("port", "")
+            database = config.get("database", "")
+            username = config.get("username", "")
+            password = config.get("password", "")
+            appkey = config.get("appkey", "")
+            appsecret = config.get("appsecret", "")
+
+            get_data = {
+                "net_value": {
+                    "action": AgentConstants.SELECT,
+                    "host": db_host,
+                    "port": port,
+                    "database": database,
+                    "username": username,
+                    "password": password
+                },
+                "data_value": {
+                    "query_key": "SELECT_TOKEN_BY_DATE",
+                    "params": {'svc_type': 'HIS'}
+                }
+            }
+
+            get_data_json = json.dumps(get_data)
+
+            token_data = self.get_valid_token_to_json(get_data_json)
+
+            if token_data:
+                access_token = token_data.get("access_token")
+                print("[정보] 데이터베이스에서 기존 유효 토큰을 로드했습니다.")
+                return access_token
+            else:
+                print("[정보] 유효한 토큰이 없거나 만료되었습니다. 새 토큰을 요청합니다...")
+                token_request_json = json.dumps({
+                "appkey": appkey,
+                "appsecret": appsecret
+                })
+
+                try:
+                    token_data = self.get_access_token_to_json(token_request_json)
+
+                    access_token = token_data.get("access_token")
+
+                    token_data["rule_no"] = AgentUtils.get_rule_no()
+                    token_data["svc_type"] = "HIS"
+
+                    set_data = {
+                        "net_value": {
+                            "action": AgentConstants.INSERT,
+                            "host": db_host,
+                            "port": port,
+                            "database": database,
+                            "username": username,
+                            "password": password
+                        },
+                        "data_value": {
+                            "query_key": "INSERT_TOKEN_INFO",
+                            "params": token_data
+                        }
+                    }
+
+                    self.set_valid_token_to_string(json.dumps(set_data))
+                    print("[정보] 새 토큰을 데이터베이스에 성공적으로 저장했습니다.")
+
+                    return access_token
+                
+                except Exception as e:
+                    print(f"[오류] 토큰 발급 및 저장 중 문제가 발생했습니다: {e}")
+                    return None
+
+        except Exception as e:
+            print(e)
+            raise e
+    
     def set_valid_token_to_json(self, model_json: str) -> Dict[str, Any]:
         try:
-            raw_string  = self.__set_valid_token(model_json)
-            return json.loads(raw_string)
+            return self._execute_and_convert(self.__set_valid_token, model_json, to_json=True)
         except Exception as e:
             print(e)
             raise e
 
     def set_valid_token_to_string(self, model_json: str) -> str:
         try:
-            return self.__set_valid_token(model_json)
+            return self._execute_and_convert(self.__set_valid_token, model_json, to_json=False)
         except Exception as e:
             print(e)
             raise e
 
     def get_valid_token_to_json(self, model_json: str) -> Dict[str, Any]:
         try:
-            raw_string  = self.__get_valid_token(model_json)
-            return json.loads(raw_string)
+            return self._execute_and_convert(self.__get_valid_token, model_json, to_json=True)
         except Exception as e:
             print(e)
             raise e
 
     def get_valid_token_to_string(self, model_json: str) -> str:
         try:
-            return self.__get_valid_token(model_json)
+            return self._execute_and_convert(self.__get_valid_token, model_json, to_json=False)
         except Exception as e:
             print(e)
             raise e
@@ -43,45 +126,42 @@ class KisService(BaseService):
 
     def get_access_token_to_json(self, model_json: str) -> Dict[str, Any]:
         try:
-            raw_string = self.__get_access_token(model_json)
-            return json.loads(raw_string)
+            return self._execute_and_convert(self.__get_access_token, model_json, to_json=True)
         except Exception as e:
             print(e)
             raise e
 
     def get_access_token_to_string(self, model_json: str) -> str:
         try:
-            return self.__get_access_token(model_json)
+            return self._execute_and_convert(self.__get_access_token, model_json, to_json=False)
         except Exception as e:
             print(e)
             raise e
 
     def get_kospi_index_to_json(self, model_json: str) -> Dict[str, Any]:
         try:
-            raw_string = self.__get_kospi_index(model_json)
-            return json.loads(raw_string)
+            return self._execute_and_convert(self.__get_kospi_index, model_json, to_json=True)
         except Exception as e:
             print(e)
             raise e
 
     def get_kospi_index_to_string(self, model_json: str) -> str:
         try:
-            return self.__get_kospi_index(model_json)
+            return self._execute_and_convert(self.__get_kospi_index, model_json, to_json=False)
         except Exception as e:
             print(e)
             raise e
 
     def get_stock_price_to_json(self, model_json: str) -> Dict[str, Any]:
         try:
-            raw_string  = self.__get_stock_price(model_json)
-            return json.loads(raw_string)
+            return self._execute_and_convert(self.__get_stock_price, model_json, to_json=True)
         except Exception as e:
             print(e)
             raise e
 
     def get_stock_price_to_string(self, model_json: str) -> str:
         try:
-            return self.__get_stock_price(model_json)
+            return self._execute_and_convert(self.__get_stock_price, model_json, to_json=False)
         except Exception as e:
             print(e)
             raise e
@@ -90,6 +170,9 @@ class KisService(BaseService):
         try:
             # 외부에서 들어온 데이터 JSON을 파이썬 딕셔너리로 즉시 파싱
             model_data: Dict[str, Any] = json.loads(model_json)
+
+            if not isinstance(model_data, dict):
+                raise
 
             net_value: Dict[str, Any] = {}
 
@@ -109,7 +192,7 @@ class KisService(BaseService):
             model_data["service_map"]["appkey"] = model_data.get("appkey", "")
             model_data["service_map"]["appsecret"] = model_data.get("appsecret", "")
 
-            # 부모 클래스(BaseAgent)의 규격에 맞게 다시 JSON 문자열로 직렬화하여 바인딩
+            # 부모 클래스(BaseService)의 규격에 맞게 다시 JSON 문자열로 직렬화하여 바인딩
             data_value_json = json.dumps(model_data["service_map"])
 
             # 부모의 동기식 HTTP 요청 처리 메서드 작동
@@ -118,17 +201,16 @@ class KisService(BaseService):
 
             return response_string if response_string is not None else ""
 
-        except json.JSONDecodeError as e:
-            print("입력된 model_json의 형식이 올바른 JSON 포맷이 아닙니다.")
-            raise e
         except Exception as e:
-            print(e)
             raise e
 
     def __get_kospi_index(self, model_json: str) -> str:
         try:
             # 외부에서 들어온 데이터 JSON을 파이썬 딕셔너리로 즉시 파싱
             model_data: Dict[str, Any] = json.loads(model_json)
+
+            if not isinstance(model_data, dict):
+                raise
 
             net_value: Dict[str, Any] = {}
 
@@ -166,17 +248,16 @@ class KisService(BaseService):
 
             return response_string if response_string is not None else ""
 
-        except json.JSONDecodeError as e:
-            print("입력된 model_json의 형식이 올바른 JSON 포맷이 아닙니다.")
-            raise e
         except Exception as e:
-            print(e)
             raise e
 
     def __get_stock_price(self, model_json: str) -> str:
         try:
             # 외부에서 들어온 데이터 JSON을 파이썬 딕셔너리로 즉시 파싱
             model_data: Dict[str, Any] = json.loads(model_json)
+
+            if not isinstance(model_data, dict):
+                raise
 
             net_value: Dict[str, Any] = {}
 
@@ -212,17 +293,16 @@ class KisService(BaseService):
             response_string = self._run(net_value_json, data_value_json)
 
             return response_string if response_string is not None else ""
-
-        except json.JSONDecodeError as e:
-            print(f"Invalid JSON format: {e}")
-            raise e
+        
         except Exception as e:
-            print(e)
             raise e
         
     def __get_valid_token(self, model_json: str) -> str:
         try:
             model_data: Dict[str, Any] = json.loads(model_json)
+
+            if not isinstance(model_data, dict):
+                raise
 
             net_value = model_data.get("net_value", {}) if model_data else {}
             data_value = model_data.get("data_value", {}) if model_data else {}
@@ -239,12 +319,14 @@ class KisService(BaseService):
             return response_string if response_string is not None else ""
         
         except Exception as e:
-            print(e)
             raise e
         
     def __set_valid_token(self, model_json: str) -> str:
         try:
             model_data: Dict[str, Any] = json.loads(model_json)
+
+            if not isinstance(model_data, dict):
+                raise
 
             net_value = model_data.get("net_value", {}) if model_data else {}
             data_value = model_data.get("data_value", {}) if model_data else {}
@@ -257,5 +339,4 @@ class KisService(BaseService):
             return response_string if response_string is not None else ""
         
         except Exception as e:
-            print(e)
             raise e

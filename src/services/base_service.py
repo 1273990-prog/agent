@@ -1,7 +1,6 @@
 from typing import Optional
 from common.http_conn import HttpConn
 from common.db_conn import DbConn
-from common.constants import AgentConstants
 import json
 
 class BaseService:
@@ -17,7 +16,6 @@ class BaseService:
 
             return http_conn.create_response()
         except Exception as e:
-            print(e)
             raise e
         
     def _run_sql(self, net_value_json: str, data_value_json: str) -> Optional[str]:        
@@ -42,6 +40,14 @@ class BaseService:
 
             return db_conn.create_response()                            
         except Exception as e:
-            print(e)
             raise e
+        
+    def _execute_and_convert(self, service_func, model_json: str, to_json: bool = False):               
+            try:                        
+                raw_string = service_func(model_json)              
+                if to_json:             
+                    return json.loads(raw_string) if raw_string else {}                                    
+                return raw_string       
+            except Exception as e:                     
+                raise e 
                                                                     
