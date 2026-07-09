@@ -15,9 +15,8 @@ class KisService(BaseService):
         try:
             config: Dict[str, Any] = config_json
 
-            if not config:
-                print("[오류] 설정을 불러올 수 없어 프로그램을 종료합니다.")
-                return
+            if not isinstance(config, dict):
+                raise
 
             access_token = None
 
