@@ -1,0 +1,18 @@
+# Python compile cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environments
+.venv/
+venv/
+ENV/
+
+# Editor settings
+.vscode/
+.idea/
+
+# Secret Key Files
+agent_key.json
+firebase_key.json
