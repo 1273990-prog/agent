@@ -2,6 +2,8 @@ from typing import Final
 
 class AgentConstants:
     KIS: Final[str] = "KIS"
+    KOREAEXIM: Final[str] = "KOREAEXIM"
+    OPINET: Final[str] = "OPINET"
 
     # HTTP Methods
     GET: Final[str] = "GET"

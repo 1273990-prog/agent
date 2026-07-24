@@ -25,8 +25,8 @@ class KisService(BaseService):
             database = config.get("database", "")
             username = config.get("username", "")
             password = config.get("password", "")
-            appkey = config.get("appkey", "")
-            appsecret = config.get("appsecret", "")
+            appkey = config.get("kis_appkey", "")
+            appsecret = config.get("kis_appsecret", "")
 
             get_data = {
                 "net_value": {

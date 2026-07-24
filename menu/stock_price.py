@@ -31,8 +31,8 @@ def main():
 
         price_request = {
             "access_token": access_token,
-            "appkey": config.get("appkey", ""),
-            "appsecret": config.get("appsecret", ""),
+            "appkey": config.get("kis_appkey", ""),
+            "appsecret": config.get("kis_appsecret", ""),
             "tr_id": "FHPUP02100000",
             "custtype": "P",
             "fid_cond_mrkt_div_code": "J",
