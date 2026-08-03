@@ -17,7 +17,71 @@ SAFE_QUERY_REGISTRY: Dict[str, str] = {
                             (rule_no, svc_type, access_token, access_token_token_expired, token_type, expires_in, create_date) 
                             VALUES   
                             (%(rule_no)s, %(svc_type)s, %(access_token)s, %(access_token_token_expired)s::TIMESTAMPTZ , %(token_type)s, %(expires_in)s::INTEGER, NOW())
-                            """                     
+                            """,
+
+        # ─── MCP 클라이언트 관리 쿼리 ───
+
+        "SELECT_CLIENT_BY_ID": """
+                            SELECT client_id, client_secret_hash, name, scopes, created_at
+                            FROM mcp_clients
+                            WHERE client_id = %(client_id)s
+                            """,
+
+        "SELECT_ALL_CLIENTS": """
+                            SELECT client_id, name, scopes, created_at
+                            FROM mcp_clients
+                            ORDER BY created_at DESC
+                            """,
+
+        "INSERT_CLIENT": """
+                            INSERT INTO mcp_clients
+                                (client_id, client_secret_hash, name, scopes, created_at)
+                            VALUES
+                                (%(client_id)s, %(client_secret_hash)s,
+                                 %(name)s, %(scopes)s, NOW())
+                            """,
+
+        "DELETE_CLIENT_BY_ID": """
+                            DELETE FROM mcp_clients
+                            WHERE client_id = %(client_id)s
+                            """,
+
+        # ─── 기업 코드 정보 저장 쿼리 ───
+
+        "INSERT_CORP_CODE_INFO": """
+                            INSERT INTO corp_code_info 
+                                (rule_no, corp_code, corp_name, corp_eng_name, stock_code, modify_date, create_date)
+                            VALUES 
+                                (%(rule_no)s, %(corp_code)s, %(corp_name)s, %(corp_eng_name)s, %(stock_code)s, %(modify_date)s, NOW())
+                            """,
+
+        "SELECT_CORP_CODE_BY_NAME": """
+                            SELECT rule_no, corp_code, corp_name
+                            FROM corp_code_info
+                            WHERE corp_name = %(corp_name)s
+                            LIMIT 1
+                            """,
+
+        "SELECT_CORP_CODE_BY_STOCK_CODE": """
+                            SELECT rule_no, corp_code, corp_name, stock_code
+                            FROM corp_code_info
+                            WHERE stock_code = %(stock_code)s
+                            LIMIT 1
+                            """,
+
+        # ─── 재무제표 정보 저장 쿼리 ───
+
+        "INSERT_FIN_STMT_INFO": """
+                            INSERT INTO fin_stmt_info
+                                (rule_no, corp_no, bsns_year, account_id, account_nm, account_detail, thstrm_amount, ord, thstrm_nm, fs_div, fs_nm, sj_div, sj_nm, rcept_no, reprt_code, create_date)
+                            VALUES
+                                (%(rule_no)s, %(corp_no)s, %(bsns_year)s, %(account_id)s, %(account_nm)s, %(account_detail)s, %(thstrm_amount)s::NUMERIC, %(ord)s::INTEGER, %(thstrm_nm)s, %(fs_div)s, %(fs_nm)s, %(sj_div)s, %(sj_nm)s, %(rcept_no)s, %(reprt_code)s, NOW())
+                            """,
+
+        "DELETE_FIN_STMT_INFO_BY_CORP_NO": """
+                            DELETE FROM fin_stmt_info
+                            WHERE corp_no = %(corp_no)s
+                            """
 }
 
 class DbConn:
@@ -118,8 +182,11 @@ class DbConn:
             # Query에 바인딩할 파라미터 추출
             bind_params = self.__data_value.get("params", {}) if self.__data_value else {}
 
-            # 2) 쿼리 실행
-            self.__cursor.execute(self.__sql_query, bind_params)
+            # 2) 쿼리 실행 (리스트 파라미터 전달 시 executemany 일괄 처리)
+            if isinstance(bind_params, list):
+                self.__cursor.executemany(self.__sql_query, bind_params)
+            else:
+                self.__cursor.execute(self.__sql_query, bind_params)
 
             # 3) 액션에 따른 반환 데이터 처리 (HttpConn의 ReadToEnd Stream 처리와 대응)
             result_data: Any = None
