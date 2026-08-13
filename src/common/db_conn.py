@@ -69,6 +69,17 @@ SAFE_QUERY_REGISTRY: Dict[str, str] = {
                             LIMIT 1
                             """,
 
+        "SELECT_UNCOLLECTED_CORP_CODES": """
+                            SELECT c.rule_no, c.corp_code, c.corp_name, c.stock_code
+                            FROM corp_code_info c
+                            WHERE NOT EXISTS (
+                                SELECT 1
+                                FROM fin_stmt_info f
+                                WHERE f.corp_no = c.rule_no
+                            )
+                            ORDER BY c.rule_no
+                            """,
+
         # ─── 재무제표 정보 저장 쿼리 ───
 
         "INSERT_FIN_STMT_INFO": """
@@ -81,6 +92,46 @@ SAFE_QUERY_REGISTRY: Dict[str, str] = {
         "DELETE_FIN_STMT_INFO_BY_CORP_NO": """
                             DELETE FROM fin_stmt_info
                             WHERE corp_no = %(corp_no)s
+                            """,
+
+        # ─── 재무제표 벡터 임베딩 쿼리 ───
+
+        "SELECT_FIN_STMT_FOR_VECTORIZE": """
+                            SELECT f.rule_no, f.corp_no, f.bsns_year, f.account_id,
+                                   f.account_nm, f.account_detail, f.thstrm_amount,
+                                   f.sj_div, f.sj_nm, f.fs_div, f.fs_nm,
+                                   f.rcept_no, f.reprt_code,
+                                   c.corp_name
+                            FROM fin_stmt_info f
+                            JOIN corp_code_info c ON f.corp_no = c.rule_no
+                            WHERE NOT EXISTS (
+                                SELECT 1
+                                FROM fin_stmt_embedding e
+                                WHERE e.rel_no = f.rule_no
+                            )
+                            ORDER BY f.bsns_year DESC, c.corp_name
+                            LIMIT 1000
+                            """,
+
+        "INSERT_FIN_STMT_EMBEDDING": """
+                            INSERT INTO fin_stmt_embedding
+                                (rule_no, rel_no, corp_no, corp_name, bsns_year,
+                                 sj_div, account_nm, document_text, embedding)
+                            VALUES
+                                (%(rule_no)s, %(rel_no)s, %(corp_no)s, %(corp_name)s, %(bsns_year)s,
+                                 %(sj_div)s, %(account_nm)s, %(document_text)s,
+                                 %(embedding)s::vector)
+                            """,
+
+        "SEARCH_FIN_STMT_EMBEDDING": """
+                            SELECT rule_no, rel_no, corp_name, bsns_year, account_nm,
+                                   document_text,
+                                   1 - (embedding <=> %(query_embedding)s::vector) AS similarity
+                            FROM fin_stmt_embedding
+                            WHERE (%(corp_no)s IS NULL OR corp_no = %(corp_no)s)
+                              AND (%(bsns_year)s IS NULL OR bsns_year = %(bsns_year)s)
+                            ORDER BY embedding <=> %(query_embedding)s::vector
+                            LIMIT %(top_k)s
                             """
 }
 
