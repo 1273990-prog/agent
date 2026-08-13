@@ -15,7 +15,7 @@ class AgentUtils:
         
         # 1. YYYYMMDDHH24MISSMS 형태의 현재 시간 포맷팅 (밀리초 3자리 포함)
         # %f는 마이크로초(6자리)를 리턴하므로 끝의 3자리를 잘라 밀리초로 만듭니다.
-        now = datetime.now(timezone.utc)
+        now = datetime.now()
         time_str = now.strftime("%Y%m%d%H%M%S%f")[:-3]
     
         # 2. UUID 생성 후 하이픈('-') 제거
