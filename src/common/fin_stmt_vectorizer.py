@@ -10,7 +10,6 @@ import sys
 import os
 import io
 import json
-import re
 from typing import Dict, Any, List, Optional
 from decimal import Decimal
 
@@ -102,22 +101,21 @@ def build_document_text(row: Dict[str, Any]) -> str:
 
 def vectorize_fin_stmt_data(
     batch_size: int = 10,
-    embedding_provider: str = "gemini"
+    embedding_provider: str = "bge"
 ) -> Dict[str, Any]:
     """
     아직 벡터화되지 않은 fin_stmt_info 레코드를 일괄 임베딩하여
     fin_stmt_embedding 테이블에 저장합니다.
-    Google AI Studio 무료 플랜(15 RPM)에 맞추어 소규모 배치 단위로 안전하게 즉시 커밋합니다.
 
     Args:
         batch_size: 한 번에 처리 및 DB 커밋할 데이터 단위 (기본값 10건)
-        embedding_provider: 임베딩 제공자 ("gemini")
+        embedding_provider: 임베딩 제공자 ("bge": 로컬 BGE-M3, "gemini": Gemini API)
 
     Returns:
         처리 결과 요약 딕셔너리
     """
     print("\n" + "=" * 80)
-    print("        [ 재무제표 벡터화 배치 스크립트 (무료 플랜 15 RPM 최적화) ]")
+    print("        [ 재무제표 벡터화 배치 스크립트 ]")
     print("=" * 80)
 
     # 1. 설정 로드
@@ -126,14 +124,9 @@ def vectorize_fin_stmt_data(
         print("[오류] agent_key.json 설정 정보를 로드할 수 없습니다.")
         return {"total_processed": 0, "total_skipped": 0, "status": "error"}
 
-    # 2. 임베딩 클라이언트 생성
-    gemini_api_key = config.get("gemini_api_key", "")
-    if not gemini_api_key:
-        print("[오류] agent_key.json에 'gemini_api_key'가 설정되어 있지 않습니다.")
-        return {"total_processed": 0, "total_skipped": 0, "status": "error"}
-
+    # 2. 임베딩 클라이언트 생성 (프로바이더별 분기)
     try:
-        embed_client = create_embedding_client(provider=embedding_provider, api_key=gemini_api_key)
+        embed_client = _create_embed_client(embedding_provider, config)
         print(f"  [초기화] 임베딩 모델: {embed_client.model_name} (차원: {embed_client.dimension})")
     except Exception as e:
         print(f"[오류] 임베딩 클라이언트 초기화 실패: {e}")
@@ -192,8 +185,8 @@ def vectorize_fin_stmt_data(
     total_batches = (total_valid + batch_size - 1) // batch_size
     print(f"  [문장 생성 완료] 유효: {total_valid}건, 건너뜀: {skipped}건 (총 {total_batches}개 배치 예정)")
 
-    # 5. 소규모 배치 단위 순차 임베딩 & DB 즉시 커밋 (무료 플랜 15 RPM 준수)
-    print(f"\n  [무료 플랜 15 RPM 배치 실행] 배치 크기: {batch_size}건 단위 즉시 DB 커밋")
+    # 5. 배치 단위 순차 임베딩 & DB 즉시 커밋
+    print(f"\n  [{embedding_provider.upper()} 배치 실행] 배치 크기: {batch_size}건 단위 즉시 DB 커밋")
 
     db_net_value_insert = {
         "host": config.get("db_host", ""),
@@ -270,9 +263,8 @@ def vectorize_fin_stmt_data(
 def search_financial_data(
     query: str,
     corp_no: Optional[str] = None,
-    bsns_year: Optional[str] = None,
     top_k: int = 5,
-    embedding_provider: str = "gemini"
+    embedding_provider: str = "bge"
 ) -> List[Dict[str, Any]]:
     """
     자연어 질문을 임베딩하여 fin_stmt_embedding에서 유사한 재무제표 데이터를 검색합니다.
@@ -280,9 +272,8 @@ def search_financial_data(
     Args:
         query: 자연어 검색 질의 (예: "삼성전자 2024년 매출액")
         corp_no: 특정 기업으로 제한할 corp_no (None이면 전체 검색)
-        bsns_year: 특정 연도로 제한할 사업연도 (None이면 쿼리에서 자동 추출)
         top_k: 반환할 최대 결과 수
-        embedding_provider: 임베딩 제공자
+        embedding_provider: 임베딩 제공자 ("bge": 로컬 BGE-M3, "gemini": Gemini API)
 
     Returns:
         유사도 순으로 정렬된 결과 딕셔너리 리스트
@@ -294,13 +285,8 @@ def search_financial_data(
         print("[오류] agent_key.json 설정 정보를 로드할 수 없습니다.")
         return []
 
-    gemini_api_key = config.get("gemini_api_key", "")
-    if not gemini_api_key:
-        print("[오류] agent_key.json에 'gemini_api_key'가 설정되어 있지 않습니다.")
-        return []
-
     try:
-        embed_client = create_embedding_client(provider=embedding_provider, api_key=gemini_api_key)
+        embed_client = _create_embed_client(embedding_provider, config)
     except Exception as e:
         print(f"[오류] 임베딩 클라이언트 초기화 실패: {e}")
         return []
@@ -313,15 +299,6 @@ def search_financial_data(
         return []
 
     # 3. 벡터 유사도 검색 실행
-    corp_no_param = corp_no.strip() if (corp_no and isinstance(corp_no, str) and corp_no.strip()) else None
-
-    # bsns_year가 지정되지 않은 경우 쿼리 텍스트에서 4자리 연도(예: 2023) 추출
-    bsns_year_param = bsns_year.strip() if (bsns_year and isinstance(bsns_year, str) and bsns_year.strip()) else None
-    if not bsns_year_param and query:
-        year_match = re.search(r'(20\d{2})', query)
-        if year_match:
-            bsns_year_param = year_match.group(1)
-
     db_net_value = {
         "host": config.get("db_host", ""),
         "port": int(config.get("port", 5432)),
@@ -337,8 +314,7 @@ def search_financial_data(
             "query_key": "SEARCH_FIN_STMT_EMBEDDING",
             "params": {
                 "query_embedding": str(query_embedding),
-                "corp_no": corp_no_param,
-                "bsns_year": bsns_year_param,
+                "corp_no": corp_no,
                 "top_k": top_k
             }
         }
@@ -361,6 +337,32 @@ def search_financial_data(
 #  CLI 진입점
 # ============================================================
 
+def _create_embed_client(provider: str, config: Dict[str, Any]):
+    """
+    프로바이더에 따라 임베딩 클라이언트를 생성합니다.
+    BGE는 로컬 모델이므로 API 키 없이, Gemini는 API 키를 사용합니다.
+
+    Args:
+        provider: 임베딩 제공자 ("bge", "gemini")
+        config: agent_key.json 설정 딕셔너리
+
+    Returns:
+        BaseEmbeddingClient 구현체 인스턴스
+
+    Raises:
+        ValueError: Gemini 선택 시 API 키가 없는 경우
+    """
+    if provider == "bge":
+        return create_embedding_client(provider="bge")
+    elif provider == "gemini":
+        gemini_api_key = config.get("gemini_api_key", "")
+        if not gemini_api_key:
+            raise ValueError("agent_key.json에 'gemini_api_key'가 설정되어 있지 않습니다.")
+        return create_embedding_client(provider="gemini", api_key=gemini_api_key)
+    else:
+        raise ValueError(f"지원하지 않는 임베딩 제공자: {provider}")
+
+
 def main():
     print("\n" + "=" * 55)
     print("        [ 재무제표 벡터화 스크립트 ]")
@@ -370,10 +372,14 @@ def main():
     print("=" * 55)
     choice = input("원하는 작업 번호를 선택하세요 (1/2): ").strip()
 
+    # 프로바이더 선택 (공통)
+    provider_input = input("▶ 임베딩 모델 선택 (1: BGE-M3 로컬 [기본], 2: Gemini API): ").strip()
+    provider = "gemini" if provider_input == "2" else "bge"
+
     if choice == "1":
         batch_input = input("\n▶ 배치 크기 (기본값 100): ").strip()
         batch_size = int(batch_input) if batch_input.isdigit() else 100
-        vectorize_fin_stmt_data(batch_size=batch_size)
+        vectorize_fin_stmt_data(batch_size=batch_size, embedding_provider=provider)
 
     elif choice == "2":
         query = input("\n▶ 검색할 내용을 자연어로 입력하세요: ").strip()
@@ -384,14 +390,14 @@ def main():
         top_k_input = input("▶ 결과 수 (기본값 5): ").strip()
         top_k = int(top_k_input) if top_k_input.isdigit() else 5
 
-        results = search_financial_data(query=query, top_k=top_k)
+        results = search_financial_data(query=query, top_k=top_k, embedding_provider=provider)
 
         if not results:
             print("\n[결과 없음] 검색 결과가 없습니다.")
             return
 
         print("\n" + "=" * 100)
-        print(f"  검색어: \"{query}\" | 결과: {len(results)}건")
+        print(f"  검색어: \"{query}\" | 모델: {provider.upper()} | 결과: {len(results)}건")
         print("-" * 100)
         print(f"{'순위':^4} | {'기업명':^12} | {'연도':^6} | {'계정과목':^20} | {'유사도':^8} | 문장 (요약)")
         print("-" * 100)
