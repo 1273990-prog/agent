@@ -100,16 +100,18 @@ def build_document_text(row: Dict[str, Any]) -> str:
 # ============================================================
 
 def vectorize_fin_stmt_data(
-    batch_size: int = 10,
-    embedding_provider: str = "bge"
+    batch_size: int = 100,
+    embedding_provider: str = "bge",
+    loop_until_done: bool = True
 ) -> Dict[str, Any]:
     """
     아직 벡터화되지 않은 fin_stmt_info 레코드를 일괄 임베딩하여
     fin_stmt_embedding 테이블에 저장합니다.
 
     Args:
-        batch_size: 한 번에 처리 및 DB 커밋할 데이터 단위 (기본값 10건)
+        batch_size: 한 번에 처리 및 DB 커밋할 데이터 단위 (기본값 100건)
         embedding_provider: 임베딩 제공자 ("bge": 로컬 BGE-M3, "gemini": Gemini API)
+        loop_until_done: True인 경우 남은 미처리 데이터가 없을 때까지 무한 반복 수행
 
     Returns:
         처리 결과 요약 딕셔너리
@@ -132,7 +134,6 @@ def vectorize_fin_stmt_data(
         print(f"[오류] 임베딩 클라이언트 초기화 실패: {e}")
         return {"total_processed": 0, "total_skipped": 0, "status": "error"}
 
-    # 3. 미벡터화 데이터 조회
     db_net_value_select = {
         "host": config.get("db_host", ""),
         "port": int(config.get("port", 5432)),
@@ -141,52 +142,6 @@ def vectorize_fin_stmt_data(
         "password": config.get("password", ""),
         "action": AgentConstants.SELECT
     }
-
-    try:
-        db_conn = DbConn(json.dumps(db_net_value_select))
-        select_req = {
-            "query_key": "SELECT_FIN_STMT_FOR_VECTORIZE",
-            "params": {}
-        }
-        db_conn.create_request(json.dumps(select_req))
-        result_str = db_conn.create_response()
-        rows = json.loads(result_str)
-    except Exception as e:
-        print(f"[오류] 미벡터화 데이터 조회 실패: {e}")
-        return {"total_processed": 0, "total_skipped": 0, "status": "error"}
-
-    # 빈 결과 또는 빈 딕셔너리만 반환된 경우
-    if not rows or (len(rows) == 1 and not rows[0]):
-        print("\n  [완료] 벡터화할 신규 데이터가 없습니다. 모든 데이터가 이미 처리되었습니다.")
-        return {"total_processed": 0, "total_skipped": 0, "status": "success"}
-
-    total_rows = len(rows)
-    print(f"\n  [조회] 미벡터화 대상 레코드: 총 {total_rows}건")
-
-    # 4. 자연어 문장 생성
-    documents = []
-    valid_rows = []
-    skipped = 0
-
-    for row in rows:
-        try:
-            doc_text = build_document_text(row)
-            documents.append(doc_text)
-            valid_rows.append(row)
-        except Exception as e:
-            print(f"  [건너뜀] 문장 생성 실패 (rule_no: {row.get('rule_no', '?')}): {e}")
-            skipped += 1
-
-    if not documents:
-        print("[경고] 유효한 문장이 하나도 생성되지 않았습니다.")
-        return {"total_processed": 0, "total_skipped": skipped, "status": "error"}
-
-    total_valid = len(documents)
-    total_batches = (total_valid + batch_size - 1) // batch_size
-    print(f"  [문장 생성 완료] 유효: {total_valid}건, 건너뜀: {skipped}건 (총 {total_batches}개 배치 예정)")
-
-    # 5. 배치 단위 순차 임베딩 & DB 즉시 커밋
-    print(f"\n  [{embedding_provider.upper()} 배치 실행] 배치 크기: {batch_size}건 단위 즉시 DB 커밋")
 
     db_net_value_insert = {
         "host": config.get("db_host", ""),
@@ -197,60 +152,118 @@ def vectorize_fin_stmt_data(
         "action": AgentConstants.INSERT
     }
 
-    total_inserted = 0
+    grand_total_inserted = 0
+    grand_total_skipped = 0
+    iteration = 0
 
-    for b_idx in range(0, total_valid, batch_size):
-        batch_num = (b_idx // batch_size) + 1
-        b_rows = valid_rows[b_idx:b_idx + batch_size]
-        b_docs = documents[b_idx:b_idx + batch_size]
+    while True:
+        iteration += 1
+        print(f"\n--- [반복 회차 {iteration}] 미벡터화 데이터 조회 중... ---")
 
-        pct = ((b_idx + len(b_docs)) / total_valid) * 100
-        print(f"  [배치 {batch_num}/{total_batches}] {len(b_docs)}건 임베딩 진행 중... (누적: {total_inserted}/{total_valid}건, {pct:.1f}%)")
-
+        # 3. 미벡터화 데이터 조회 (최대 1000건)
         try:
-            b_embs = embed_client.embed_batch(b_docs, batch_size=len(b_docs))
+            db_conn = DbConn(json.dumps(db_net_value_select))
+            select_req = {
+                "query_key": "SELECT_FIN_STMT_FOR_VECTORIZE",
+                "params": {}
+            }
+            db_conn.create_request(json.dumps(select_req))
+            result_str = db_conn.create_response()
+            rows = json.loads(result_str)
         except Exception as e:
-            print(f"  [오류] 배치 {batch_num} 임베딩 중 예외 발생 (건너뜀): {e}")
-            continue
+            print(f"[오류] 미벡터화 데이터 조회 실패: {e}")
+            break
 
-        insert_params = []
-        for row, doc_text, embedding in zip(b_rows, b_docs, b_embs):
-            embedding_str = str(embedding)
-            insert_params.append({
-                "rule_no": AgentUtils.get_rule_no(),
-                "rel_no": str(row.get("rule_no", "")),
-                "corp_no": str(row.get("corp_no", "")),
-                "corp_name": str(row.get("corp_name", "")),
-                "bsns_year": str(row.get("bsns_year", "")),
-                "sj_div": str(row.get("sj_div", "")),
-                "account_nm": str(row.get("account_nm", "")),
-                "document_text": doc_text,
-                "embedding": embedding_str
-            })
+        # 빈 결과 또는 빈 딕셔너리만 반환된 경우
+        if not rows or (len(rows) == 1 and not rows[0]):
+            print("\n  [완료] 벡터화할 신규 데이터가 없습니다. 모든 데이터가 완료되었습니다.")
+            break
 
-        if insert_params:
+        total_rows = len(rows)
+        print(f"  [조회] 미벡터화 대상 레코드: {total_rows}건 (누적 저장 성공: {grand_total_inserted}건)")
+
+        # 4. 자연어 문장 생성
+        documents = []
+        valid_rows = []
+        skipped = 0
+
+        for row in rows:
             try:
-                db_conn_insert = DbConn(json.dumps(db_net_value_insert))
-                insert_req = {
-                    "query_key": "INSERT_FIN_STMT_EMBEDDING",
-                    "params": insert_params
-                }
-                db_conn_insert.create_request(json.dumps(insert_req))
-                db_conn_insert.create_response()
-                total_inserted += len(insert_params)
+                doc_text = build_document_text(row)
+                documents.append(doc_text)
+                valid_rows.append(row)
             except Exception as e:
-                print(f"  [오류] 배치 {batch_num} DB 저장 중 예외 발생: {e}")
+                print(f"  [건너뜀] 문장 생성 실패 (rule_no: {row.get('rule_no', '?')}): {e}")
+                skipped += 1
 
-    print(f"\n  [DB 저장 완료] fin_stmt_embedding 테이블에 총 {total_inserted}/{total_valid}건 저장 성공!")
+        grand_total_skipped += skipped
+        if not documents:
+            print("[경고] 이번 회차에서 유효한 문장이 하나도 생성되지 않았습니다. 중단합니다.")
+            break
+
+        total_valid = len(documents)
+        total_batches = (total_valid + batch_size - 1) // batch_size
+        print(f"  [문장 생성 완료] 유효: {total_valid}건 (총 {total_batches}개 배치 예정)")
+
+        # 5. 배치 단위 순차 임베딩 & DB 즉시 커밋
+        total_inserted = 0
+
+        for b_idx in range(0, total_valid, batch_size):
+            batch_num = (b_idx // batch_size) + 1
+            b_rows = valid_rows[b_idx:b_idx + batch_size]
+            b_docs = documents[b_idx:b_idx + batch_size]
+
+            pct = ((b_idx + len(b_docs)) / total_valid) * 100
+            print(f"  [배치 {batch_num}/{total_batches}] {len(b_docs)}건 임베딩 진행 중... (누적: {total_inserted}/{total_valid}건, {pct:.1f}%)")
+
+            try:
+                b_embs = embed_client.embed_batch(b_docs, batch_size=len(b_docs))
+            except Exception as e:
+                print(f"  [오류] 배치 {batch_num} 임베딩 중 예외 발생 (건너뜀): {e}")
+                continue
+
+            insert_params = []
+            for row, doc_text, embedding in zip(b_rows, b_docs, b_embs):
+                embedding_str = str(embedding)
+                insert_params.append({
+                    "rule_no": AgentUtils.get_rule_no(),
+                    "rel_no": str(row.get("rule_no", "")),
+                    "corp_no": str(row.get("corp_no", "")),
+                    "corp_name": str(row.get("corp_name", "")),
+                    "bsns_year": str(row.get("bsns_year", "")),
+                    "sj_div": str(row.get("sj_div", "")),
+                    "account_nm": str(row.get("account_nm", "")),
+                    "document_text": doc_text,
+                    "embedding": embedding_str
+                })
+
+            if insert_params:
+                try:
+                    db_conn_insert = DbConn(json.dumps(db_net_value_insert))
+                    insert_req = {
+                        "query_key": "INSERT_FIN_STMT_EMBEDDING",
+                        "params": insert_params
+                    }
+                    db_conn_insert.create_request(json.dumps(insert_req))
+                    db_conn_insert.create_response()
+                    total_inserted += len(insert_params)
+                except Exception as e:
+                    print(f"  [오류] 배치 {batch_num} DB 저장 중 예외 발생: {e}")
+
+        grand_total_inserted += total_inserted
+        print(f"  [회차 완료] 이번 회차 저장 성공: {total_inserted}/{total_valid}건 (누적 합계: {grand_total_inserted}건)")
+
+        if not loop_until_done:
+            break
 
     summary = {
-        "total_processed": total_inserted,
-        "total_skipped": skipped,
-        "status": "success" if total_inserted > 0 else "error"
+        "total_processed": grand_total_inserted,
+        "total_skipped": grand_total_skipped,
+        "status": "success" if grand_total_inserted > 0 else "error"
     }
 
     print("\n" + "=" * 80)
-    print(f"  [최종 결과] 처리: {summary['total_processed']}건 | 건너뜀: {summary['total_skipped']}건 | 상태: {summary['status']}")
+    print(f"  [최종 결과] 총 누적 처리: {summary['total_processed']}건 | 건너뜀: {summary['total_skipped']}건 | 상태: {summary['status']}")
     print("=" * 80 + "\n")
 
     return summary
@@ -263,6 +276,7 @@ def vectorize_fin_stmt_data(
 def search_financial_data(
     query: str,
     corp_no: Optional[str] = None,
+    bsns_year: Optional[str] = None,
     top_k: int = 5,
     embedding_provider: str = "bge"
 ) -> List[Dict[str, Any]]:
@@ -272,6 +286,7 @@ def search_financial_data(
     Args:
         query: 자연어 검색 질의 (예: "삼성전자 2024년 매출액")
         corp_no: 특정 기업으로 제한할 corp_no (None이면 전체 검색)
+        bsns_year: 특정 사업연도로 제한할 bsns_year (None이면 전체 검색)
         top_k: 반환할 최대 결과 수
         embedding_provider: 임베딩 제공자 ("bge": 로컬 BGE-M3, "gemini": Gemini API)
 
@@ -315,6 +330,7 @@ def search_financial_data(
             "params": {
                 "query_embedding": str(query_embedding),
                 "corp_no": corp_no,
+                "bsns_year": bsns_year,
                 "top_k": top_k
             }
         }
