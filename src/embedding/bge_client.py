@@ -57,9 +57,14 @@ class BgeEmbeddingClient(BaseEmbeddingClient):
 
         self._model_id = model_name or self._DEFAULT_MODEL
 
-        # 디바이스 자동 감지
+        # 디바이스 자동 감지 (CUDA → MPS(Apple Silicon) → CPU)
         if device is None:
-            self._device = "cuda" if torch.cuda.is_available() else "cpu"
+            if torch.cuda.is_available():
+                self._device = "cuda"
+            elif torch.backends.mps.is_available():
+                self._device = "mps"
+            else:
+                self._device = "cpu"
         else:
             self._device = device
 
