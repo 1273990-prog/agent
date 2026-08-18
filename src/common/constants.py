@@ -5,6 +5,7 @@ class AgentConstants:
     KOREAEXIM: Final[str] = "KOREAEXIM"
     OPINET: Final[str] = "OPINET"
     OPENDART: Final[str] = "OPENDART"
+    KRX: Final[str] = "KRX"
 
     # HTTP Methods
     GET: Final[str] = "GET"
