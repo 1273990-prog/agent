@@ -228,7 +228,6 @@ def vectorize_fin_stmt_data(
                 insert_params.append({
                     "rule_no": AgentUtils.get_rule_no(),
                     "rel_no": str(row.get("rule_no", "")),
-                    "corp_no": str(row.get("corp_no", "")),
                     "corp_name": str(row.get("corp_name", "")),
                     "bsns_year": str(row.get("bsns_year", "")),
                     "sj_div": str(row.get("sj_div", "")),

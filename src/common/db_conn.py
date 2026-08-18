@@ -115,10 +115,10 @@ SAFE_QUERY_REGISTRY: Dict[str, str] = {
 
         "INSERT_FIN_STMT_EMBEDDING": """
                             INSERT INTO fin_stmt_embedding
-                                (rule_no, rel_no, corp_no, corp_name, bsns_year,
+                                (rule_no, rel_no, corp_name, bsns_year,
                                  sj_div, account_nm, document_text, embedding)
                             VALUES
-                                (%(rule_no)s, %(rel_no)s, %(corp_no)s, %(corp_name)s, %(bsns_year)s,
+                                (%(rule_no)s, %(rel_no)s, %(corp_name)s, %(bsns_year)s,
                                  %(sj_div)s, %(account_nm)s, %(document_text)s,
                                  %(embedding)s::vector)
                             """,
@@ -128,7 +128,7 @@ SAFE_QUERY_REGISTRY: Dict[str, str] = {
                                    document_text,
                                    1 - (embedding <=> %(query_embedding)s::vector) AS similarity
                             FROM fin_stmt_embedding
-                            WHERE (%(corp_no)s IS NULL OR corp_no = %(corp_no)s)
+                            WHERE (%(corp_name)s IS NULL OR corp_name = %(corp_name)s)
                               AND (%(bsns_year)s IS NULL OR bsns_year = %(bsns_year)s)
                             ORDER BY embedding <=> %(query_embedding)s::vector
                             LIMIT %(top_k)s
