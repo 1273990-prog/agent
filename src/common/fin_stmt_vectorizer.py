@@ -274,7 +274,7 @@ def vectorize_fin_stmt_data(
 
 def search_financial_data(
     query: str,
-    corp_no: Optional[str] = None,
+    corp_name: Optional[str] = None,
     bsns_year: Optional[str] = None,
     top_k: int = 5,
     embedding_provider: str = "bge"
@@ -328,7 +328,7 @@ def search_financial_data(
             "query_key": "SEARCH_FIN_STMT_EMBEDDING",
             "params": {
                 "query_embedding": str(query_embedding),
-                "corp_no": corp_no,
+                "corp_name": corp_name,
                 "bsns_year": bsns_year,
                 "top_k": top_k
             }
