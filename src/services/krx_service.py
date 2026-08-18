@@ -4,7 +4,7 @@ from services.base_service import BaseService
 from services.registry import register_service
 from common.constants import AgentConstants
 
-@register_service(AgentConstants.KRX)  # Registers the KOREAEXIM service name dynamically
+@register_service(AgentConstants.KRX)  # Registers the KRX service name dynamically
 class KrxService(BaseService):
     def __init__(self):
         super().__init__()
@@ -40,16 +40,19 @@ class KrxService(BaseService):
             # HTTP 기본 통신 정보 조립
             net_value["method"] = AgentConstants.GET
             net_value["contentType"] = AgentConstants.JSON
+
+            net_value["headers"] = {
+                "AUTH_KEY": model_data.get("AUTH_KEY", ""),
+            }
             
             # 입력 데이터 내부에 service_map 구조가 없다면 빈 딕셔너리로 초기화
             if "service_map" not in model_data:
                 model_data["service_map"] = {}
 
-            # 고유 요구 필수 파라미터 강제 주입     
-            model_data["service_map"]["AUTH_KEY"] = model_data.get("AUTH_KEY", "")
+            # 고유 요구 필수 파라미터 강제 주입
             model_data["service_map"]["basDd"] = model_data.get("basDd", "")
 
-            # 5. 부모 클래스(BaseAgent)의 규격에 맞게 다시 JSON 문자열로 직렬화하여 바인딩
+            # 5. 부모 클래스(BaseService)의 규격에 맞게 다시 JSON 문자열로 직렬화하여 바인딩
             data_value_json = json.dumps(model_data["service_map"])
 
             # 부모의 동기식 HTTP 요청 처리 메서드 작동

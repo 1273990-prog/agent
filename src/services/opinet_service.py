@@ -55,7 +55,7 @@ class OpinetService(BaseService):
             if model_data.get("cnt"):                  
                 model_data["service_map"]["cnt"] = model_data["cnt"]
 
-            # 5. 부모 클래스(BaseAgent)의 규격에 맞게 다시 JSON 문자열로 직렬화하여 바인딩
+            # 5. 부모 클래스(BaseService)의 규격에 맞게 다시 JSON 문자열로 직렬화하여 바인딩
             data_value_json = json.dumps(model_data["service_map"])
 
             # 부모의 동기식 HTTP 요청 처리 메서드 작동
