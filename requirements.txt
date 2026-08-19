@@ -10,3 +10,7 @@ PyJWT>=2.8.0
 
 # 벡터 임베딩
 google-genai>=1.0.0
+
+# 문서 로더 (PDF)
+pymupdf>=1.24.0
+pypdf>=4.0.0

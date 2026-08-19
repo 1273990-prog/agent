@@ -132,6 +132,77 @@ SAFE_QUERY_REGISTRY: Dict[str, str] = {
                               AND (%(bsns_year)s IS NULL OR bsns_year = %(bsns_year)s)
                             ORDER BY embedding <=> %(query_embedding)s::vector
                             LIMIT %(top_k)s
+                            """,
+
+        # ─── 수출입동향 정보 저장 쿼리 ───
+
+        "INSERT_TRADE_TREND_INFO": """
+                            INSERT INTO trade_trend_info
+                                (rule_no, doc_title, publisher, report_date, period, create_date)
+                            VALUES
+                                (%(rule_no)s, %(doc_title)s, %(publisher)s, %(report_date)s::TIMESTAMPTZ, %(period)s::DATE, NOW())
+                            """,
+
+        "SELECT_TRADE_TREND_INFO_BY_TITLE_AND_PERIOD": """
+                            SELECT rule_no, doc_title, publisher, report_date, period, create_date
+                            FROM trade_trend_info
+                            WHERE doc_title = %(doc_title)s AND period = %(period)s::DATE
+                            LIMIT 1
+                            """,
+
+        "SELECT_ALL_TRADE_TREND_INFO": """
+                            SELECT rule_no, doc_title, publisher, report_date, period, create_date
+                            FROM trade_trend_info
+                            ORDER BY period DESC, create_date DESC
+                            """,
+
+        "DELETE_TRADE_TREND_DETAIL_BY_INFO_NO": """
+                            DELETE FROM trade_trend_detail
+                            WHERE trade_trend_no = %(trade_trend_no)s
+                            """,
+
+        "DELETE_TRADE_TREND_INFO_BY_ID": """
+                            DELETE FROM trade_trend_info
+                            WHERE rule_no = %(rule_no)s
+                            """,
+
+        "INSERT_TRADE_TREND_DETAIL": """
+                            INSERT INTO trade_trend_detail
+                                (rule_no, trade_trend_no, trade_trend_text, trade_trend_section, contest_type, page, extra_meta, create_date)
+                            VALUES
+                                (%(rule_no)s, %(trade_trend_no)s, %(trade_trend_text)s, %(trade_trend_section)s, %(contest_type)s, %(page)s::INTEGER, %(extra_meta)s::JSONB, NOW())
+                            """,
+
+        "SELECT_TRADE_TREND_DETAIL_FOR_VECTORIZE": """
+                            SELECT d.rule_no, d.trade_trend_no, d.trade_trend_text, d.trade_trend_section,
+                                   d.contest_type, d.page, d.extra_meta,
+                                   i.doc_title, i.publisher, i.period
+                            FROM trade_trend_detail d
+                            JOIN trade_trend_info i ON d.trade_trend_no = i.rule_no
+                            WHERE d.embedding IS NULL
+                            ORDER BY d.trade_trend_no, d.page, d.rule_no
+                            """,
+
+        "UPDATE_TRADE_TREND_DETAIL_EMBEDDING": """
+                            UPDATE trade_trend_detail
+                            SET embedding = %(embedding)s::vector
+                            WHERE rule_no = %(rule_no)s
+                            """,
+
+        "SEARCH_TRADE_TREND_DETAIL_EMBEDDING": """
+                            SELECT d.rule_no, d.trade_trend_no, d.trade_trend_text, d.trade_trend_section,
+                                   d.contest_type, d.page, d.extra_meta,
+                                   i.doc_title, i.publisher, i.period,
+                                   1 - (d.embedding <=> %(query_embedding)s::vector) AS similarity
+                            FROM trade_trend_detail d
+                            JOIN trade_trend_info i ON d.trade_trend_no = i.rule_no
+                            WHERE d.embedding IS NOT NULL
+                              AND (%(period)s IS NULL OR i.period = %(period)s::DATE)
+                              AND (%(item)s IS NULL OR d.extra_meta->>'item' = %(item)s)
+                              AND (%(region)s IS NULL OR d.extra_meta->>'region' = %(region)s)
+                              AND (%(contest_type)s IS NULL OR d.contest_type = %(contest_type)s)
+                            ORDER BY d.embedding <=> %(query_embedding)s::vector
+                            LIMIT %(top_k)s
                             """
 }
 
