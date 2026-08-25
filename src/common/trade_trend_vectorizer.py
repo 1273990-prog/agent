@@ -354,7 +354,7 @@ def get_vectorization_status():
                    count(CASE WHEN d.embedding IS NOT NULL THEN 1 END) as vectorized_cnt,
                    count(CASE WHEN d.embedding IS NULL THEN 1 END) as unvectorized_cnt
             FROM trade_trend_info i
-            LEFT JOIN trade_trend_detail d ON i.rule_no = d.trade_trend_no
+            LEFT JOIN trade_trend_detail d ON i.rule_no = d.group_no
             GROUP BY i.rule_no, i.period, i.doc_title
             ORDER BY i.period ASC;
         """)

@@ -715,7 +715,7 @@ def save_trade_trend_json_to_db(
 
         detail_params.append({
             "rule_no": d_rule_no,
-            "trade_trend_no": info_rule_no,
+            "group_no": info_rule_no,
             "trade_trend_text": c_text,
             "trade_trend_section": c_section,
             "contest_type": c_type,
@@ -841,7 +841,7 @@ def save_trade_trend_pdf_to_db(
 
         detail_params.append({
             "rule_no": d_rule_no,
-            "trade_trend_no": info_rule_no,
+            "group_no": info_rule_no,
             "trade_trend_text": c.get("text", ""),
             "trade_trend_section": c.get("section", "")[:100],
             "contest_type": c_type,
@@ -888,7 +888,7 @@ def _clean_existing_trade_trend_data(db_base_config: Dict[str, Any], target_titl
             db_conn_del_d = DbConn(json.dumps({**db_base_config, "action": AgentConstants.DELETE}))
             db_conn_del_d.create_request(json.dumps({
                 "query_key": "DELETE_TRADE_TREND_DETAIL_BY_INFO_NO",
-                "params": {"trade_trend_no": old_rule_no}
+                "params": {"group_no": old_rule_no}
             }))
             db_conn_del_d.create_response()
 
@@ -909,7 +909,7 @@ def _print_summary(target_title: str, info_rule_no: str, total_chunks: int, type
     print("\n" + "=" * 105)
     print(f"        [ 적재 결과 요약: {target_title} ]")
     print("=" * 105)
-    print(f"  • 마스터 PK (trade_trend_no) : {info_rule_no}")
+    print(f"  • 마스터 PK (group_no) : {info_rule_no}")
     print(f"  • 적재된 총 청크 수            : {total_chunks}개")
     print(f"  • 청크 유형별 현황            : ", end="")
     summary_types = [f"{k}: {v}건" for k, v in type_counter.items()]

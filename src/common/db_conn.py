@@ -158,7 +158,7 @@ SAFE_QUERY_REGISTRY: Dict[str, str] = {
 
         "DELETE_TRADE_TREND_DETAIL_BY_INFO_NO": """
                             DELETE FROM trade_trend_detail
-                            WHERE trade_trend_no = %(trade_trend_no)s
+                            WHERE group_no = %(group_no)s
                             """,
 
         "DELETE_TRADE_TREND_INFO_BY_ID": """
@@ -168,19 +168,19 @@ SAFE_QUERY_REGISTRY: Dict[str, str] = {
 
         "INSERT_TRADE_TREND_DETAIL": """
                             INSERT INTO trade_trend_detail
-                                (rule_no, trade_trend_no, trade_trend_text, trade_trend_section, contest_type, page, extra_meta, create_date)
+                                (rule_no, group_no, trade_trend_text, trade_trend_section, contest_type, page, extra_meta, create_date)
                             VALUES
-                                (%(rule_no)s, %(trade_trend_no)s, %(trade_trend_text)s, %(trade_trend_section)s, %(contest_type)s, %(page)s::INTEGER, %(extra_meta)s::JSONB, NOW())
+                                (%(rule_no)s, %(group_no)s, %(trade_trend_text)s, %(trade_trend_section)s, %(contest_type)s, %(page)s::INTEGER, %(extra_meta)s::JSONB, NOW())
                             """,
 
         "SELECT_TRADE_TREND_DETAIL_FOR_VECTORIZE": """
-                            SELECT d.rule_no, d.trade_trend_no, d.trade_trend_text, d.trade_trend_section,
+                            SELECT d.rule_no, d.group_no, d.trade_trend_text, d.trade_trend_section,
                                    d.contest_type, d.page, d.extra_meta,
                                    i.doc_title, i.publisher, i.period
                             FROM trade_trend_detail d
-                            JOIN trade_trend_info i ON d.trade_trend_no = i.rule_no
+                            JOIN trade_trend_info i ON d.group_no = i.rule_no
                             WHERE d.embedding IS NULL
-                            ORDER BY d.trade_trend_no, d.page, d.rule_no
+                            ORDER BY d.group_no, d.page, d.rule_no
                             """,
 
         "UPDATE_TRADE_TREND_DETAIL_EMBEDDING": """
@@ -190,12 +190,12 @@ SAFE_QUERY_REGISTRY: Dict[str, str] = {
                             """,
 
         "SEARCH_TRADE_TREND_DETAIL_EMBEDDING": """
-                            SELECT d.rule_no, d.trade_trend_no, d.trade_trend_text, d.trade_trend_section,
+                            SELECT d.rule_no, d.group_no, d.trade_trend_text, d.trade_trend_section,
                                    d.contest_type, d.page, d.extra_meta,
                                    i.doc_title, i.publisher, i.period,
                                    1 - (d.embedding <=> %(query_embedding)s::vector) AS similarity
                             FROM trade_trend_detail d
-                            JOIN trade_trend_info i ON d.trade_trend_no = i.rule_no
+                            JOIN trade_trend_info i ON d.group_no = i.rule_no
                             WHERE d.embedding IS NOT NULL
                               AND (%(period)s IS NULL OR i.period = %(period)s::DATE)
                               AND (%(item)s IS NULL OR d.extra_meta->>'item' = %(item)s)
