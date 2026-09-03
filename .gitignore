@@ -16,3 +16,6 @@ ENV/
 # Secret Key Files
 agent_key.json
 firebase_key.json
+
+# Sample Data
+src/trade_trend_chunks.json
