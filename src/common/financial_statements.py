@@ -4,7 +4,12 @@ import json
 from typing import Dict, Any
 from datetime import date
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
+# 'src' 디렉터리를 Python 검색 경로에 추가
+current_dir = os.path.dirname(os.path.abspath(__file__))  # src/common
+src_dir = os.path.abspath(os.path.join(current_dir, '..'))  # src
+
+if src_dir not in sys.path:
+    sys.path.insert(0, src_dir)
 
 from services.service_factory import ServiceFactory
 from common.constants import AgentConstants

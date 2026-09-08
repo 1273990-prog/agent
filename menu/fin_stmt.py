@@ -1,9 +1,88 @@
 import sys
 import os
+import json
+from typing import Optional, List, Dict, Any
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 
-from common.fin_stmt_vectorizer import search_financial_data
+from common.constants import AgentConstants
+from common.utils import AgentUtils
+from common.db_conn import DbConn
+from embedding import create_embedding_client
+
+
+def _create_embed_client(provider: str, config: Dict[str, Any]):
+    """프로바이더에 따라 임베딩 클라이언트를 생성합니다."""
+    if provider == "bge":
+        return create_embedding_client(provider="bge")
+    elif provider == "gemini":
+        gemini_api_key = config.get("gemini_api_key", "")
+        if not gemini_api_key:
+            raise ValueError("agent_key.json에 'gemini_api_key'가 설정되어 있지 않습니다.")
+        return create_embedding_client(provider="gemini", api_key=gemini_api_key)
+    else:
+        raise ValueError(f"지원하지 않는 임베딩 제공자: {provider}")
+
+
+def search_financial_data(
+    query: str,
+    corp_name: Optional[str] = None,
+    bsns_year: Optional[str] = None,
+    account_nm: Optional[str] = None,
+    top_k: int = 10,
+    embedding_provider: str = "bge"
+) -> List[Dict[str, Any]]:
+    """자연어 질문을 임베딩하여 fin_stmt_embedding에서 유사한 재무제표 데이터를 검색합니다."""
+
+    config = AgentUtils.load_config("agent_key.json")
+    if not isinstance(config, dict) or not config:
+        print("[오류] agent_key.json 설정 정보를 로드할 수 없습니다.")
+        return []
+
+    try:
+        embed_client = _create_embed_client(embedding_provider, config)
+    except Exception as e:
+        print(f"[오류] 임베딩 클라이언트 초기화 실패: {e}")
+        return []
+
+    try:
+        query_embedding = embed_client.embed_query(query)
+    except Exception as e:
+        print(f"[오류] 쿼리 임베딩 실패: {e}")
+        return []
+
+    db_net_value = {
+        "host": config.get("db_host", ""),
+        "port": int(config.get("port", 5432)),
+        "database": config.get("database", ""),
+        "username": config.get("username", ""),
+        "password": config.get("password", ""),
+        "action": AgentConstants.SELECT
+    }
+
+    try:
+        db_conn = DbConn(json.dumps(db_net_value))
+        search_req = {
+            "query_key": "SEARCH_FIN_STMT_EMBEDDING",
+            "params": {
+                "query_embedding": str(query_embedding),
+                "corp_name": corp_name,
+                "bsns_year": bsns_year,
+                "account_nm": account_nm,
+                "top_k": top_k
+            }
+        }
+        db_conn.create_request(json.dumps(search_req))
+        result_str = db_conn.create_response()
+        results = json.loads(result_str)
+    except Exception as e:
+        print(f"[오류] 벡터 검색 실패: {e}")
+        return []
+
+    if not results or (len(results) == 1 and not results[0]):
+        return []
+
+    return results
 
 
 def main():
