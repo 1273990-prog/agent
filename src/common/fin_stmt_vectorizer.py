@@ -276,7 +276,8 @@ def search_financial_data(
     query: str,
     corp_name: Optional[str] = None,
     bsns_year: Optional[str] = None,
-    top_k: int = 5,
+    account_nm: Optional[str] = None,
+    top_k: int = 10,
     embedding_provider: str = "bge"
 ) -> List[Dict[str, Any]]:
     """
@@ -284,8 +285,9 @@ def search_financial_data(
 
     Args:
         query: 자연어 검색 질의 (예: "삼성전자 2024년 매출액")
-        corp_no: 특정 기업으로 제한할 corp_no (None이면 전체 검색)
+        corp_name: 특정 기업으로 제한할 corp_name (None이면 전체 검색)
         bsns_year: 특정 사업연도로 제한할 bsns_year (None이면 전체 검색)
+        account_nm: 특정 계정과목으로 제한할 account_nm (None이면 전체 검색)
         top_k: 반환할 최대 결과 수
         embedding_provider: 임베딩 제공자 ("bge": 로컬 BGE-M3, "gemini": Gemini API)
 
@@ -330,6 +332,7 @@ def search_financial_data(
                 "query_embedding": str(query_embedding),
                 "corp_name": corp_name,
                 "bsns_year": bsns_year,
+                "account_nm": account_nm,
                 "top_k": top_k
             }
         }

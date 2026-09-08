@@ -130,6 +130,7 @@ SAFE_QUERY_REGISTRY: Dict[str, str] = {
                             FROM fin_stmt_embedding
                             WHERE (%(corp_name)s IS NULL OR corp_name = %(corp_name)s)
                               AND (%(bsns_year)s IS NULL OR bsns_year = %(bsns_year)s)
+                              AND (%(account_nm)s IS NULL OR account_nm = %(account_nm)s)
                             ORDER BY embedding <=> %(query_embedding)s::vector
                             LIMIT %(top_k)s
                             """,
