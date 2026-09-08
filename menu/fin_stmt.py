@@ -144,9 +144,9 @@ def main():
             year = str(r.get("bsns_year", ""))
             acct = str(r.get("account_nm", ""))[:20]
             sim = r.get("similarity", 0)
-            doc = str(r.get("document_text", ""))[:50]
+            doc = str(r.get("document_text", ""))
             sim_display = f"{float(sim):.4f}" if sim else "N/A"
-            print(f"{idx:^4} | {corp:^12} | {year:^6} | {acct:^20} | {sim_display:^8} | {doc}...")
+            print(f"{idx:^4} | {corp:^12} | {year:^6} | {acct:^20} | {sim_display:^8} | {doc}")
 
         print("=" * 100 + "\n")
 

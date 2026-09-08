@@ -160,9 +160,9 @@ def main():
             title = str(r.get("doc_title", ""))[:24]
             sec = str(r.get("trade_trend_section", ""))[:28]
             sim = r.get("similarity", 0)
-            text = str(r.get("trade_trend_text", "")).replace("\n", " ")[:45]
+            text = str(r.get("trade_trend_text", ""))
             sim_display = f"{float(sim):.4f}" if sim else "N/A"
-            print(f"{idx:^4} | {p:^10} | {title:<24} | {sec:<28} | {sim_display:^8} | {text}...")
+            print(f"{idx:^4} | {p:^10} | {title:<24} | {sec:<28} | {sim_display:^8} | {text}")
 
         print("=" * 110 + "\n")
 
