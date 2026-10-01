@@ -51,7 +51,11 @@ try:
     import pymupdf  # PyMuPDF
     HAS_PYMUPDF = True
 except ImportError:
-    HAS_PYMUPDF = False
+    try:
+        import fitz as pymupdf
+        HAS_PYMUPDF = True
+    except ImportError:
+        HAS_PYMUPDF = False
 
 try:
     import pypdf
