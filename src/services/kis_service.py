@@ -137,16 +137,16 @@ class KisService(BaseService):
             print(e)
             raise e
 
-    def get_kospi_index_to_json(self, model_json: str) -> Dict[str, Any]:
+    def get_market_index_to_json(self, model_json: str) -> Dict[str, Any]:
         try:
-            return self._execute_and_convert(self.__get_kospi_index, model_json, to_json=True)
+            return self._execute_and_convert(self.__get_market_index, model_json, to_json=True)
         except Exception as e:
             print(e)
             raise e
 
-    def get_kospi_index_to_string(self, model_json: str) -> str:
+    def get_market_index_to_string(self, model_json: str) -> str:
         try:
-            return self._execute_and_convert(self.__get_kospi_index, model_json, to_json=False)
+            return self._execute_and_convert(self.__get_market_index, model_json, to_json=False)
         except Exception as e:
             print(e)
             raise e
@@ -244,7 +244,7 @@ class KisService(BaseService):
         except Exception as e:
             raise e
 
-    def __get_kospi_index(self, model_json: str) -> str:
+    def __get_market_index(self, model_json: str) -> str:
         try:
             # 외부에서 들어온 데이터 JSON을 파이썬 딕셔너리로 즉시 파싱
             model_data: Dict[str, Any] = json.loads(model_json)

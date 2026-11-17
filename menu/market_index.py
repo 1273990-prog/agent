@@ -24,7 +24,7 @@ def main():
             print("▶ 토큰이 발급되지 않아 지수를 조회할 수 없습니다.")
             return
 
-        print("\n조회할 지수 코드 0001: KOSPI, 2001: KOSPI 200")
+        print("\n조회할 지수 코드 0001: KOSPI, 2001: KOSPI 200, 1001: KOSDAQ")
 
         index_code = input().strip() or "0001"
 
@@ -39,7 +39,7 @@ def main():
         }
 
         print(f"[정보] 지수 코드 {index_code}를 조회 중입니다...")
-        result = kis_service.get_kospi_index_to_json(json.dumps(index_request))
+        result = kis_service.get_market_index_to_json(json.dumps(index_request))
         
         rt_cd = result.get("rt_cd")
         msg1 = result.get("msg1", "")
